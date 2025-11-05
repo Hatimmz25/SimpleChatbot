@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Simple Chatbot - AI Assistant</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <div class="js-container"></div>
+
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="text/babel">
+      const Chatbot = {
+        defaultResponses: {
+          'hello hi hey greetings salam labas': `Hello! Labas 3lik! 👋\nHow can I help you today?\nKifach n9der n3awnek?`,
+          'how are you labas 3lik kidayr': `I'm doing great! Ana bikhir! \nHow can I help you?\nKifach n9der n3awnek?`,
+          'goodbye bye see you bslama ': `Goodbye! Bslama! \nHave a great day! ntchawfo!`,
+          'help assistance ': function() {
+            return `I can help you with:\nAna n9der n3awnek f:\n\n• Flip a coin (Taj ola Malik) \n• Roll a dice (rmi nard) 🎲\n• Get date/time (l'heure w date) \n• Do calculations (l7isab) ➗\n• Convert temperatures (tbdil température) 🌡️\n• Random numbers (numéro aléatoire)  \n\nTry asking me something!\nEssayi goul liya chi 7aja!`;
+          },
+          'flip a coin rmi derhem': function () {
+            const randomNumber = Math.random();
+            return randomNumber < 0.5 ? 'Sure! You got heads \n(Lmalik!)' : 'Sure! You got tails \n(Taj!)';
+          },
+          'roll a dice roll dice rmi nard nard': function() {
+            const diceResult = Math.floor(Math.random() * 6) + 1;
+            return `Sure! You got ${diceResult} 🎲\n(Jarya!)`;
+          },
+          'what is the date today date ina nhar db': function () {
+            const now = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            return `Today is:\nLyoum howa:\n${now.toLocaleDateString('en-US', options)} `;
+          },
+          'what is the time time now ch7al sa3a daba ': function() {
+            const now = new Date();
+            return `The current time is:\nSa3a daba hiya:\n${now.toLocaleTimeString('en-US')} `;
+          },
+          'calculate calc math l7isab 7sab hsab': function(message) {
+            const match = message.match(/(\d+\.?\d*)\s*([\+\-\*\/])\s*(\d+\.?\d*)/);
+            if (match) {
+              const num1 = parseFloat(match[1]);
+              const operator = match[2];
+              const num2 = parseFloat(match[3]);
+              let result;
+              
+              switch(operator) {
+                case '+': result = num1 + num2; break;
+                case '-': result = num1 - num2; break;
+                case '*': result = num1 * num2; break;
+                case '/': result = num2 !== 0 ? num1 / num2 : 'Error: mymknch t9sem 3la 0'; break;
+              }
+              
+              return typeof result === 'number' ? `${num1} ${operator} ${num2} = ${result}\n ` : result;
+            }
+            return 'Please provide a calculation like:\n"calculate 5 + 3" ';
+          },
+          'random number numéro aléatoire ra9m': function(message) {
+            const match = message.match(/(\d+)\s*(?:to|and|l)\s*(\d+)/);
+            if (match) {
+              const min = parseInt(match[1]);
+              const max = parseInt(match[2]);
+              const random = Math.floor(Math.random() * (max - min + 1)) + min;
+              return `Random number:\nRa9m 3echwa2i:\nBetween ${min} and ${max}:\n🎲 ${random}`;
+            }
+            return `Random number:\nRa9m 3echwa2i:\n🎲 ${Math.floor(Math.random() * 100)}`;
+          },
+          'thank thanks merci choukran baraka': 'You\'re welcome! merhba! \nLet me know if you need anything else!\nIla 7tajiti chi 7aja goul liya!',
+        },
+        
+        getResponse: function (message) {
+          if (!message || !message.trim()) {
+            return 'Your message is empty!\nma ktebti walo! ';
+          }
+          
+          const processedMessage = message.toLowerCase().trim();
+          const responses = this.defaultResponses;
+          const { ratings, bestMatchIndex } = this.stringSimilarity(processedMessage, Object.keys(responses));
+          const bestResponseRating = ratings[bestMatchIndex].rating;
+          
+          if (bestResponseRating <= 0.3) {
+            return `Sorry, I didn't quite understand that. or refresh the page\nSma7 liya, ma fhemtch mezyan. awla dir refresh l page\n\nTry "help" for commands! `;
+          }
+          
+          const bestResponseKey = ratings[bestMatchIndex].target;
+          const response = responses[bestResponseKey];
+          
+          if (typeof response === 'function') {
+            return response.call(this, processedMessage);
+          } else {
+            return response;
+          }
+        },
+        
+        compareTwoStrings: function (first, second) {
+          first = first.replace(/\s+/g, '');
+          second = second.replace(/\s+/g, '');
+          if (first === second) return 1;
+          if (first.length < 2 || second.length < 2) return 0;
+          
+          let firstBigrams = new Map();
+          for (let i = 0; i < first.length - 1; i++) {
+            const bigram = first.substring(i, i + 2);
+            const count = firstBigrams.has(bigram) ? firstBigrams.get(bigram) + 1 : 1;
+            firstBigrams.set(bigram, count);
+          }
+          
+          let intersectionSize = 0;
+          for (let i = 0; i < second.length - 1; i++) {
+            const bigram = second.substring(i, i + 2);
+            const count = firstBigrams.has(bigram) ? firstBigrams.get(bigram) : 0;
+            if (count > 0) {
+              firstBigrams.set(bigram, count - 1);
+              intersectionSize++;
+            }
+          }
+          
+          return (2.0 * intersectionSize) / (first.length + second.length - 2);
+        },
+        
+        stringSimilarity: function (mainString, targetStrings) {
+          const ratings = [];
+          let bestMatchIndex = 0;
+          
+          for (let i = 0; i < targetStrings.length; i++) {
+            const currentTargetString = targetStrings[i];
+            const currentRating = this.compareTwoStrings(mainString, currentTargetString);
+            ratings.push({target: currentTargetString, rating: currentRating});
+            if (currentRating > ratings[bestMatchIndex].rating) {
+              bestMatchIndex = i;
+            }
+          }
+          
+          return { ratings: ratings, bestMatchIndex: bestMatchIndex };
+        }
+      };
+
+      function ChatHeader({ onClear }) {
+        return (
+          <div className="chat-header">
+            <div className="bot-avatar-header">🤖</div>
+            <div className="header-info">
+              <div className="header-title">AI Assistant Created By: Hatim</div>
+              <div className="header-status">
+                <span className="status-dot"></span>
+                <span>Online - En ligne</span>
+              </div>
+            </div>
+            <button className="clear-button" onClick={onClear}>
+              Clear
+            </button>
+          </div>
+        );
+      }
+
+      function TypingIndicator() {
+        return (
+          <div className="typing-indicator">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23667eea'/%3E%3Ctext x='50' y='70' font-size='60' text-anchor='middle' fill='white'%3E🤖%3C/text%3E%3C/svg%3E" className="chat-message-profile" alt="Bot" />
+            <div className="typing-bubble">
+              <div className="typing-dot"></div>
+              <div className="typing-dot"></div>
+              <div className="typing-dot"></div>
+            </div>
+          </div>
+        );
+      }
+
+      function QuickActions({ onQuickAction }) {
+        const actions = [
+          { label: 'Help / Mosa3ada', value: 'help' },
+          { label: 'Flip Coin ', value: 'rmi derhem' },
+          { label: 'Calculation ', value: 'calculate' },
+          { label: 'Time ', value: 'what time' },
+        ];
+
+        return (
+          <div className="quick-actions">
+            {actions.map((action, index) => (
+              <button
+                key={index}
+                className="quick-action-btn"
+                onClick={() => onQuickAction(action.value)}
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
+        );
+      }
+
+      function ChatInput({ chatMessages, setChatMessages }) {
+        const [inputText, setInputText] = React.useState('');
+        const [isTyping, setIsTyping] = React.useState(false);
+
+        function saveInputText(event) {
+          setInputText(event.target.value);
+        }
+
+        function sendMessage(messageText = inputText) {
+          if (!messageText.trim()) return;
+
+          const userMessage = {
+            message: messageText,
+            sender: 'user',
+            id: crypto.randomUUID()
+          };
+
+          setChatMessages([...chatMessages, userMessage]);
+          setInputText('');
+          setIsTyping(true);
+
+          setTimeout(() => {
+            const response = Chatbot.getResponse(messageText);
+            const botMessage = {
+              message: response,
+              sender: 'robot',
+              id: crypto.randomUUID()
+            };
+            
+            setChatMessages(prev => [...prev, botMessage]);
+            setIsTyping(false);
+          }, 800);
+        }
+
+        function handleKeyPress(event) {
+          if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            sendMessage();
+          }
+        }
+
+        return (
+          <>
+            {isTyping && (
+              <div style={{ padding: '0 20px 10px' }}>
+                <TypingIndicator />
+              </div>
+            )}
+            <QuickActions onQuickAction={sendMessage} />
+            <div className="chat-input-container">
+              <input
+                placeholder="Type a message... Kteb chi 7aja..."
+                onChange={saveInputText}
+                onKeyPress={handleKeyPress}
+                value={inputText}
+                className="chat-input"
+              />
+              <button
+                onClick={() => sendMessage()}
+                className="send-button"
+                disabled={!inputText.trim()}
+              >
+                ➤
+              </button>
+            </div>
+          </>
+        );
+      }
+
+      function ChatMessage({ message, sender }) {
+        const avatarSrc = sender === 'robot'
+          ? "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23667eea'/%3E%3Ctext x='50' y='70' font-size='60' text-anchor='middle' fill='white'%3E🤖%3C/text%3E%3C/svg%3E"
+          : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%2364748b'/%3E%3Ctext x='50' y='70' font-size='60' text-anchor='middle' fill='white'%3E👤%3C/text%3E%3C/svg%3E";
+
+        return (
+          <div className={
+            sender === 'user'
+              ? 'chat-message-user'
+              : 'chat-message-robot'
+          }>
+            <img src={avatarSrc} className="chat-message-profile" alt={sender} />
+            <div className="chat-message-text">
+              {message}
+            </div>
+          </div>
+        );
+      }
+
+      function ChatMessages({ chatMessages }) {
+        const chatMessagesRef = React.useRef(null);
+
+        React.useEffect(() => {
+          const containerElem = chatMessagesRef.current;
+          if (containerElem) {
+            containerElem.scrollTop = containerElem.scrollHeight;
+          }
+        }, [chatMessages]);
+
+        return (
+          <div className="chat-messages-container" ref={chatMessagesRef}>
+            {chatMessages.map((chatMessage) => {
+              return (
+                <ChatMessage
+                  message={chatMessage.message}
+                  sender={chatMessage.sender}
+                  key={chatMessage.id}
+                />
+              );
+            })}
+          </div>
+        );
+      }
+
+      function App() {
+        const [chatMessages, setChatMessages] = React.useState([{
+          message: 'Hello! salam ! 👋\n\nI\'m your bilingual AI assistant.\nAna ey ay dyalek!\n\nHow can I help you today?\nKifach n9der n3awnek?',
+          sender: 'robot',
+          id: 'welcome-msg'
+        }]);
+
+        function clearChat() {
+          setChatMessages([{
+            message: 'Chat cleared! Mse7ti lmessajat! 🧹\n\nHow can I help you?\nKifach n9der n3awnek?',
+            sender: 'robot',
+            id: crypto.randomUUID()
+          }]);
+        }
+
+        return (
+        <>
+          <div className="app-container">
+            <ChatHeader onClear={clearChat} />
+            <div className="welcome-badge">
+              🌍 English & Darija Support
+            </div>
+            <ChatMessages chatMessages={chatMessages} />
+            <ChatInput
+              chatMessages={chatMessages}
+              setChatMessages={setChatMessages}
+            />
+            </div>
+            
+          </>
+        );
+      }
+
+      const container = document.querySelector('.js-container');
+      ReactDOM.createRoot(container).render(<App />);
+    </script>
+    
+  </body>
+</html>
